@@ -51,6 +51,7 @@
 					i = r*32*32+g*32+b;
 					cat = categoryLut[i];
 					bins[cat].push(rgb);
+					bins[0].push(rgb); // there's no cat 0; use that bin to store all colors
 				}
 			}
 		}
@@ -59,7 +60,7 @@
 
 	function createImageBins(bins) {
 		var img;
-		for (var i=1; i <= 13; i++) {
+		for (var i=0; i <= 13; i++) {
 			img = createImage(128, 128, bins[i]);
 			$('#main').append(img);
 		}
