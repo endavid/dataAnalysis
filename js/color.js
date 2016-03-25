@@ -4,6 +4,28 @@
 	var myCanvas;
 	var myWorker;
 	var colorBins;
+	var colorConversions = {
+		spaceSrgb: {
+			to: intToNormalizedSrgb,
+			from: normalizedSrgbToInt
+		},
+		spaceRgb: {
+			to: function(rgb) {
+				return normalizedSrgbToRgb(intToNormalizedSrgb(rgb));
+			},
+			from: function(rgb) {
+				return normalizedSrgbToInt(linearRgbToNormalizedSrgb(rgb));
+			}
+		},
+		spaceLab: {
+			to: function(rgb) {
+				return xyzToLab(linearRgbToXyz(normalizedSrgbToRgb(intToNormalizedSrgb(rgb))));
+			},
+			from: function(lab) {
+				return normalizedSrgbToInt(linearRgbToNormalizedSrgb(xyzToLinearRgb(labToXyz(lab))));
+			}
+		}
+	};
 
 	function saturate(a) {
 		return a < 0 ? 0 : a > 1 ? 1 : a;
@@ -15,12 +37,70 @@
 		var b = Math.round(255.0*v[2]);
 		return (r << 16) | (g << 8) | b;
 	}
-
 	function intToNormalizedSrgb(rgb) {
 		var r = (1/255.0) * ((rgb >> 16) & 0xff);
 		var g = (1/255.0) * ((rgb >> 8) & 0xff);
 		var b = (1/255.0) * (rgb & 0xff);
 		return [r, g, b];
+	}
+	function normalizedSrgbToRgb(rgbVector) {
+		var linearRgb = rgbVector.map(function (c) {
+				if (c <= 0.04045) {
+					return c / 12.92;
+				}
+				return Math.pow((c + 0.055) / 1.055, 2.4);
+		});
+		return linearRgb;
+	}
+	function linearRgbToNormalizedSrgb(rgb) {
+		var srgb = rgb.map(function (c) {
+			if (c <= 0.0031308) {
+				return c * 12.92;
+			}
+			return Math.pow(c * 1.055, 1/2.4) - 0.055;
+		});
+		return srgb;
+	}
+	function linearRgbToXyz(rgb) {
+		var x = rgb[0] * 0.4124 + rgb[1] * 0.3576 + rgb[2] * 0.1805;
+		var y = rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722;
+ 		var z = rgb[0] * 0.0193 + rgb[1] * 0.1192 + rgb[2] * 0.9505;
+		return [x,y,z];
+	}
+	function xyzToLinearRgb(xyz) {
+		var r = xyz[0] *  3.2406 + xyz[1] * -1.5372 + xyz[2] * -0.4986;
+		var g = xyz[0] * -0.9689 + xyz[1] *  1.8758 + xyz[2] *  0.0415;
+		var b = xyz[0] *  0.0557 + xyz[1] * -0.2040 + xyz[2] *  1.0570;
+		return [r, g, b];
+	}
+	function xyzToLab(xyz) {
+		// D65 White point (x,y)=0.31382,0.33100;
+		var rXyz = [xyz[0]/0.95047, xyz[1], xyz[2]/1.08883];
+		var e=216/24389; // the actual CIE standard is 0.008856
+		var k=24389/27;  // the actual CIE standard is 903.3
+		var fXyz = xyz.map(function (c) {
+			if (c <= e) {
+				return (k * c + 16) / 116;
+			}
+			return Math.pow(c, 1/3);
+		});
+		var lab = [116 * fXyz[1] - 16, 500 * (fXyz[0] - fXyz[1]), 200 * (fXyz[1] - fXyz[2])];
+		return lab;
+	}
+	function labToXyz(lab) {
+		var e=216/24389; // the actual CIE standard is 0.008856
+		var y = ( lab[0] + 16 ) / 116;
+ 		var x = lab[1] / 500 + y;
+		var z = y - lab[2] / 200;
+		var xyz = [x, y, z].map(function(c) {
+			var c3 = Math.pow(c, 3);
+			if (c3 <= e) {
+				return (c - 16 / 116) / 7.787;
+			}
+			return c3;
+		});
+		// D65 White reference point
+		return [xyz[0]*0.95047, xyz[1] ,xyz[2]*1.08883];
 	}
 
 	function createImageSrc(width, height, rgbData) {
@@ -84,12 +164,14 @@
 		}
 	}
 
-	function startSomWork(bins, width, height, iterations) {
+	function startSomWork(bins, width, height, iterations, space) {
+		var fnTo = colorConversions[space].to;
+		var fnFrom = colorConversions[space].from;
 		var load = {
 			numIterations: iterations,
 			width: width,
 			height: height,
-			bins: bins.map(function(a) {return a.map(intToNormalizedSrgb);})
+			bins: bins.map(function(a) {return a.map(fnTo);})
 		};
 		for (var i=0; i<bins.length;i++) {
 			if ($("#som"+i).length === 0) {
@@ -101,7 +183,7 @@
 			myWorker.postMessage(load);
 			myWorker.onmessage = function(e) {
 				var somId = e.data.index;
-				var somRgbData = e.data.solution.map(normalizedSrgbToInt);
+				var somRgbData = e.data.solution.map(fnFrom);
 				var imgSrc = createImageSrc(width, height, somRgbData);
 				$("#som"+somId).attr('src', imgSrc);
 				//document.getElementById("myBar").style.width = e.data.done + "%";
@@ -115,7 +197,8 @@
 		var width = $('#somWidth').val();
 		var height = $('#somHeight').val();
 		var iterations = $('#somIterations').val();
-		startSomWork(colorBins, width, height, iterations);
+		var space = $('#somColorSpace').val();
+		startSomWork(colorBins, width, height, iterations, space);
 	}
 
 	function createDropdownList(id, list, callback) {
@@ -131,32 +214,39 @@
 	}
 
   function main() {
+		var w = 64, h = 64, its = 400;
 		myCanvas = document.createElement('canvas');
 		$('#main').append($("<input type='button' value='Restart'>").click(updateParameters));
 		$('#main').append(" Width = ");
-		$('#main').append($("<input type='number' maxlength='3' id='somWidth' value='64'>"));
+		$('#main').append($("<input type='number' maxlength='3' id='somWidth' value='"+w+"'>"));
 		$('#main').append(" Height = ");
-		$('#main').append($("<input type='number' maxlength='3' id='somHeight' value='64'>"));
+		$('#main').append($("<input type='number' maxlength='3' id='somHeight' value='"+h+"'>"));
 		$('#main').append(" Color Space = ");
 		$('#main').append(createDropdownList("somColorSpace", [
-			{name: "sRGB", value: "sRGB"},
-			{name: "RGB", value: "RGB"},
-			{name: "Lab", value: "Lab"}
+			{name: "sRGB", value: "spaceSrgb"},
+			{name: "RGB", value: "spaceRgb"},
+			{name: "Lab", value: "spaceLab"}
 		], updateParameters));
 		$('#main').append(" Iterations = ");
-		$('#main').append($("<input type='number' maxlength='3' id='somIterations' value='1000'>"));
+		$('#main').append($("<input type='number' maxlength='3' id='somIterations' value='"+its+"'>"));
 		$('#main').append($("<p>"));
 		$('#main').append($('<div>').attr('id',"myProgress").append($('<div>').attr('id',"myBar")));
 		$('#main').append($("<p>"));
 		loadBinary("cc14.raw", function(bytes) {
 			colorBins = createColorBins(bytes);
 			//createImageBins(bins);
-			startSomWork(colorBins, 64, 64, 1000);
+			startSomWork(colorBins, w, h, its, "spaceSrgb");
 		});
   }
 
   $( document ).ready(function() {
 		main();
+		window.normalizedSrgbToRgb = normalizedSrgbToRgb;
+		window.linearRgbToXyz = linearRgbToXyz;
+		window.linearRgbToNormalizedSrgb = linearRgbToNormalizedSrgb;
+		window.xyzToLinearRgb = xyzToLinearRgb;
+		window.xyzToLab = xyzToLab;
+		window.labToXyz = labToXyz;
 	});
 
 })();
