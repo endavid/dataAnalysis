@@ -2,7 +2,8 @@
 	"use strict";
 
 	var myCanvas;
-
+	var myWorker;
+	var colorBins;
 
 	function saturate(a) {
 		return a < 0 ? 0 : a > 1 ? 1 : a;
@@ -91,10 +92,12 @@
 			bins: bins.map(function(a) {return a.map(intToNormalizedSrgb);})
 		};
 		for (var i=0; i<bins.length;i++) {
-			$('#main').append($('<img>').attr('id', "som"+i));
+			if ($("#som"+i).length === 0) {
+				$('#main').append($('<img>').attr('id', "som"+i));
+			}
 		}
 		if (window.Worker) {
-			var myWorker = new Worker("somWorker.js");
+			myWorker = new Worker("somWorker.js");
 			myWorker.postMessage(load);
 			myWorker.onmessage = function(e) {
 				var somId = e.data.index;
@@ -105,12 +108,43 @@
 		}
 	}
 
+	function updateParameters() {
+		myWorker.terminate();
+		var width = $('#somWidth').val();
+		var height = $('#somHeight').val();
+		startSomWork(colorBins, width, height);
+	}
+
+	function createDropdownList(id, list, callback) {
+    var updateFunction = function(event) {
+      var i = event.target.selectedIndex;
+      callback(event.target.options[i].innerHTML, event.target.value);
+    };
+    var select = $('<select>').attr('id', id).change(updateFunction);
+    list.forEach(function (obj) {
+      select.append($('<option>').attr('value', obj.value).append(obj.name));
+    });
+		return select;
+	}
+
   function main() {
 		myCanvas = document.createElement('canvas');
+		$('#main').append($("<input type='button' value='Restart'>").click(updateParameters));
+		$('#main').append(" Width = ");
+		$('#main').append($("<input type='number' maxlength='3' id='somWidth' value='64'>"));
+		$('#main').append(" Height = ");
+		$('#main').append($("<input type='number' maxlength='3' id='somHeight' value='64'>"));
+		$('#main').append(" Color Space = ");
+		$('#main').append(createDropdownList("somColorSpace", [
+			{name: "sRGB", value: "sRGB"},
+			{name: "RGB", value: "RGB"},
+			{name: "Lab", value: "Lab"}
+		], updateParameters));
+		$('#main').append($("<p>"));
 		loadBinary("cc14.raw", function(bytes) {
-			var bins = createColorBins(bytes);
+			colorBins = createColorBins(bytes);
 			//createImageBins(bins);
-			startSomWork(bins, 64, 64);
+			startSomWork(colorBins, 64, 64);
 		});
   }
 

@@ -1,11 +1,67 @@
 <html>
 <head>
+  <title>EnDavid.com: Color Experiments</title>
+  <meta name="keywords" content="EnDavid, Self-Organizing Maps, Universal Color Categories">
+  <link rel="stylesheet" type="text/css" href="http://endavid.com/styles/sphericalSnake.css" title="snake"/>
+  <!-- alternate styles -->
+  <link rel="alternate stylesheet" type="text/css" href="http://endavid.com/styles/wb13.css" title="wb13"/>
+  <link rel="alternate stylesheet" type="text/css" href="http://endavid.com/styles/c64.css" title="c64"/>
+  <script src="https://google-code-prettify.googlecode.com/svn/loader/run_prettify.js?skin=sunburst"></script>
   <script type="text/javascript" src="ext/jquery-1.12.1.min.js"></script>
   <script type="text/javascript" src="nn.js"></script>
   <script type="text/javascript" src="color.js"></script>
+  <style>
+  input {
+    width: 60px;
+  }
+  </style>
 </head>
 <body>
-  <div id="main">
-  </div>
+  <div id="page">
+    <div id="sidemenu"></div>
+    <div id="mainarea">
+      <div id="header"></div>
+      <div id="contentarea">
+        <h3>Self-Organizing Maps</h3>
+        <p/>
+        <div id="main">
+        </div>
+        <p/>
+        <a href="https://en.wikipedia.org/wiki/Self-organizing_map">Self-Organizing Maps</a> are a type
+        of artificial neural networks that use unsupervised learning to create a "map", a discrete 2D
+        representation of the input space of the training samples.
+        <p/>
+        I've used SOMs in my research to generate color palettes based on universal color categories.
+        You can read more details in my PhD thesis,
+        <blockquote>
+        "Region-based Image Abstraction for Retrieval and Synthesis", Tokyo Institute of Technology, January 2008, <a href="data/phd.pdf">(.pdf 55MB)</a>, <a href="data/phd-handout.pdf">(small handout 19MB)</a>, Projects: <a href="http://code.google.com/p/sketch2collage/">Sketch2Collage</a>
+        </blockquote>
+        <p/>
+        I've created here a small demo in Javascript to iteratively compute those color palettes.
+        You can find all the code <a href="https://github.com/endavid/dataAnalysis">Github</a>.
+        <p/>
+        I'm using Javascript workers to update the images on each iteration, so you should see them getting updated at the top of this page.
+        The worker code is really simple,
+        <p/>
+        <pre class="prettyprint">
+  self.importScripts('nn.js');
+  onmessage = function(e) {
+    for (var s=0; s &lt; e.data.numIterations; s++) {
+      for (i=0; i &lt; soms.length; i++) {
+        soms[i].solve(s);
+        var itResult = {
+          index: i,
+          solution: soms[i].weights
+        };
+        postMessage(itResult);
+      }
+    }
+  };
+        </pre>
+        <p/>
+      </div>
+    </div>
+    <div id="footer"></div>
+  </div> <!-- page -->
 </body>
 </html>
