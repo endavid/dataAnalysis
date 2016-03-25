@@ -10,16 +10,19 @@ onmessage = function(e) {
     );
     var initResult = {
       index: i,
+      done: 0,
       solution: som.weights
     };
     soms.push(som);
     postMessage(initResult);
   }
+  var totalInv = 100.0/(e.data.numIterations * soms.length);
   for (var s=0; s<e.data.numIterations; s++) {
     for (i=0; i<soms.length; i++) {
       soms[i].solve(s);
       var itResult = {
         index: i,
+        done: totalInv * (s * soms.length + i + 1),
         solution: soms[i].weights
       };
       postMessage(itResult);

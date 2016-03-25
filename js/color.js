@@ -84,9 +84,9 @@
 		}
 	}
 
-	function startSomWork(bins, width, height) {
+	function startSomWork(bins, width, height, iterations) {
 		var load = {
-			numIterations: 1000,
+			numIterations: iterations,
 			width: width,
 			height: height,
 			bins: bins.map(function(a) {return a.map(intToNormalizedSrgb);})
@@ -104,6 +104,8 @@
 				var somRgbData = e.data.solution.map(normalizedSrgbToInt);
 				var imgSrc = createImageSrc(width, height, somRgbData);
 				$("#som"+somId).attr('src', imgSrc);
+				//document.getElementById("myBar").style.width = e.data.done + "%";
+				$("#myBar").css('width', e.data.done + "%");
 			};
 		}
 	}
@@ -112,7 +114,8 @@
 		myWorker.terminate();
 		var width = $('#somWidth').val();
 		var height = $('#somHeight').val();
-		startSomWork(colorBins, width, height);
+		var iterations = $('#somIterations').val();
+		startSomWork(colorBins, width, height, iterations);
 	}
 
 	function createDropdownList(id, list, callback) {
@@ -140,11 +143,15 @@
 			{name: "RGB", value: "RGB"},
 			{name: "Lab", value: "Lab"}
 		], updateParameters));
+		$('#main').append(" Iterations = ");
+		$('#main').append($("<input type='number' maxlength='3' id='somIterations' value='1000'>"));
+		$('#main').append($("<p>"));
+		$('#main').append($('<div>').attr('id',"myProgress").append($('<div>').attr('id',"myBar")));
 		$('#main').append($("<p>"));
 		loadBinary("cc14.raw", function(bytes) {
 			colorBins = createColorBins(bytes);
 			//createImageBins(bins);
-			startSomWork(colorBins, 64, 64);
+			startSomWork(colorBins, 64, 64, 1000);
 		});
   }
 
