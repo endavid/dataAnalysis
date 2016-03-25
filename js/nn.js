@@ -8,13 +8,18 @@ function euclideanDistance(a, b) {
   return Math.sqrt(squareEuclideanDistance(a,b));
 }
 
-function SelfOrganizingMap(width, height) {
+function SelfOrganizingMap(width, height, numIterations, trainingData) {
   var self = this instanceof SelfOrganizingMap ? this : Object.create(SelfOrganizingMap.prototype);
   self.width = width;
   self.height = height;
   self.radius = 0.5 * (width > height ? width : height);
   self.weights = [];
   self.distance = euclideanDistance;
+  self.numIterations = numIterations;
+  self.trainingData = trainingData;
+  self.startLearningRate = 0.1;
+  self.lambda = numIterations / Math.log(self.radius);
+  self.init(trainingData);
 }
 
 // instead of random weights, use the data we have
@@ -49,27 +54,28 @@ SelfOrganizingMap.prototype.updateNeurons = function(learningRate, neighborhoodR
   }
 };
 
-SelfOrganizingMap.prototype.learn = function(trainingData, numIterations) {
-  this.init(trainingData);
-  var startLearningRate = 0.1;
-  var lambda = numIterations / Math.log(this.radius);
-  for (var s = 0; s < numIterations; s++) {
-    var t = Math.floor(trainingData.length * Math.random());
-    var neighborhoodRadius = this.radius * Math.exp(-s/lambda);
-    var Dt = trainingData[t];
-    var minDistance = this.distance(Dt, this.weights[0]);
-    var u = [0, 0];
-    for (var j = 0; j < this.height; j++) {
-      for (var i = 0; i < this.width; i++) {
-        var index = j *  this.width + i;
-        var d = this.distance(Dt, this.weights[index]);
-        if (d < minDistance) {
-          minDistance = d;
-          u = [i, j];
-        }
+SelfOrganizingMap.prototype.solve = function(step) {
+  var t = Math.floor(this.trainingData.length * Math.random());
+  var neighborhoodRadius = this.radius * Math.exp(-step/this.lambda);
+  var Dt = this.trainingData[t];
+  var minDistance = this.distance(Dt, this.weights[0]);
+  var u = [0, 0];
+  for (var j = 0; j < this.height; j++) {
+    for (var i = 0; i < this.width; i++) {
+      var index = j *  this.width + i;
+      var d = this.distance(Dt, this.weights[index]);
+      if (d < minDistance) {
+        minDistance = d;
+        u = [i, j];
       }
     }
-    var alpha = startLearningRate * Math.exp(-s/numIterations);
-    this.updateNeurons(alpha, neighborhoodRadius, u, Dt);
-  } // iterate
+  }
+  var alpha = this.startLearningRate * Math.exp(-step/this.numIterations);
+  this.updateNeurons(alpha, neighborhoodRadius, u, Dt);
+};
+
+SelfOrganizingMap.prototype.learn = function() {
+  for (var s = 0; s < this.numIterations; s++) {
+    this.solve(s);
+  }
 };

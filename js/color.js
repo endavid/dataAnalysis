@@ -22,7 +22,7 @@
 		return [r, g, b];
 	}
 
-	function createImage(width, height, rgbData) {
+	function createImageSrc(width, height, rgbData) {
 		myCanvas.width = width;
 		myCanvas.height = height;
 		var ctx = myCanvas.getContext("2d");
@@ -36,9 +36,7 @@
 	  	imgData.data[i+3]=255; // alpha
   	}
 		ctx.putImageData(imgData,0,0);
-		var image = new Image();
-		image.src = myCanvas.toDataURL("image/png");
-		return image;
+		return myCanvas.toDataURL("image/png");
 	}
   // http://stackoverflow.com/a/21944028/1765629
   function loadBinary(url, callback) {
@@ -85,21 +83,34 @@
 		}
 	}
 
-	function somTest(bins) {
-		var som = new SelfOrganizingMap(64, 64);
-		var td = bins[7].map(intToNormalizedSrgb);
-		som.learn(td, 1000);
-		var somRgbData = som.weights.map(normalizedSrgbToInt);
-		var img = createImage(som.width, som.height, somRgbData);
-		$('#main').append(img);
+	function startSomWork(bins, width, height) {
+		var load = {
+			numIterations: 1000,
+			width: width,
+			height: height,
+			bins: bins.map(function(a) {return a.map(intToNormalizedSrgb);})
+		};
+		for (var i=0; i<bins.length;i++) {
+			$('#main').append($('<img>').attr('id', "som"+i));
+		}
+		if (window.Worker) {
+			var myWorker = new Worker("somWorker.js");
+			myWorker.postMessage(load);
+			myWorker.onmessage = function(e) {
+				var somId = e.data.index;
+				var somRgbData = e.data.solution.map(normalizedSrgbToInt);
+				var imgSrc = createImageSrc(width, height, somRgbData);
+				$("#som"+somId).attr('src', imgSrc);
+			};
+		}
 	}
 
   function main() {
 		myCanvas = document.createElement('canvas');
 		loadBinary("cc14.raw", function(bytes) {
 			var bins = createColorBins(bytes);
-			createImageBins(bins);
-			somTest(bins);
+			//createImageBins(bins);
+			startSomWork(bins, 64, 64);
 		});
   }
 
